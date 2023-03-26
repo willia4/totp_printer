@@ -151,12 +151,13 @@ void PrintUsage() {
     WriteStringn(L"     --version   OPTIONAL FLAG                                ");
     WriteStringn(L"                 prints the program's version and exits       ");
     WriteStringn(L"");
-    WriteStringn("Examples: ");
-    WriteStringn(std::format(L"{} --secret JBSWY3DPEHPK3PXP", fileName));
+    WriteStringn("  Examples: ");
+    WriteStringn(std::format(L"  {} --secret JBSWY3DPEHPK3PXP", fileName));
     WriteStringn("");
-    WriteStringn(std::format(L"{} --secret JBSWY3DPEHPK3PXP --hash sha256", fileName));
+    WriteStringn(std::format(L"  {} --secret JBSWY3DPEHPK3PXP --hash sha256", fileName));
     WriteStringn("");
-    WriteStringn(std::format(L"{} --secret JBSWY3DPEHPK3PXP --hash sha1 --period 30 --digits 6", fileName));
+    WriteStringn(std::format(L"  {} --secret JBSWY3DPEHPK3PXP --hash sha1 --period 30 --digits 6", fileName));
+    WriteStringn("");
     WriteStringn("");
     WriteStringn("  More information: https://github.com/willia4/totp_printer");
     WriteStringn("");
