@@ -37,6 +37,8 @@ struct TOTPConfig {
     crypto::E_HASH_ALGORITHM hashAlgorithm;
     int digits;
     int period;
+    bool copyToClipboard;
+    bool writeToStdOut;
 };
 
 std::wstring GetMainExePath() {
@@ -105,6 +107,7 @@ void PrintUsage() {
 
     WriteStringn(firstLine);
     WriteStringn(std::format(L"  {}[--period <period>] [--hash <hash algorithm>]", indent));
+    WriteStringn(std::format(L"  {}[--copy] [--no-out] [--help] [--version]", indent));
 
     WriteStringn("");
     WriteStringn("  Print a Time-Based One-Time password to the console");
@@ -135,9 +138,18 @@ void PrintUsage() {
     WriteStringn(L"                 available as the \"algorithm \" parameter    ");
     WriteStringn(L"                 of the otpauth URL or QR code                ");
     WriteStringn(L"                                                              ");
-    WriteStringn(L"     --help      prints this message and exits                ");
+    WriteStringn(L"     --copy      OPTIONAL FLAG                                ");
+    WriteStringn(L"                 copies the password to the Windows           ");
+    WriteStringn(L"                 clipboard in addition to outputting it       ");
+    WriteStringn(L"                                                              ");
+    WriteStringn(L"     --no-out    OPTIONAL FLAG                                ");
+    WriteStringn(L"                 Do not write the password the console output ");
+    WriteStringn(L"                                                              ");
+    WriteStringn(L"     --help      OPTIONAL FLAG                                ");
+    WriteStringn(L"                 prints this message and exits                ");
     WriteStringn(L"");
-    WriteStringn(L"     --version   prints the program's version and exits       ");
+    WriteStringn(L"     --version   OPTIONAL FLAG                                ");
+    WriteStringn(L"                 prints the program's version and exits       ");
     WriteStringn(L"");
     WriteStringn("Examples: ");
     WriteStringn(std::format(L"{} --secret JBSWY3DPEHPK3PXP", fileName));
@@ -168,6 +180,8 @@ TOTPConfig ParseCommandLine(const int argc, char* argv[]) {
     parsedArgs["--digits"] = std::optional<std::string>("6");
 
     std::map<std::string, bool> flags;
+    flags["--copy"] = false;
+    flags["--no-out"] = false;
     flags["--help"] = false;
     flags["--version"] = false;
 
@@ -238,6 +252,8 @@ TOTPConfig ParseCommandLine(const int argc, char* argv[]) {
     res.hashAlgorithm = hashAlgorithm;
     res.digits = std::stoi(parsedArgs["--digits"].value_or("6"));
     res.period = std::stoi(parsedArgs["--period"].value_or("30"));
+    res.copyToClipboard = flags["--copy"];
+    res.writeToStdOut = !flags["--no-out"];
 
     if (res.period <= 0) {
         throw std::runtime_error("--period must be greater than 0");
@@ -253,6 +269,34 @@ TOTPConfig ParseCommandLine(const int argc, char* argv[]) {
     return res;
 }
 
+void SetTextToClipboard(const std::string text) {
+    if (!OpenClipboard(nullptr)) {
+        throw std::runtime_error("Could not open clipboard");
+    }
+
+    EmptyClipboard();
+
+    const auto bufferSize = sizeof(char) * (text.size() + 1);
+    const HGLOBAL dataHandle = GlobalAlloc(GMEM_MOVEABLE, bufferSize);
+    if (dataHandle == nullptr) {
+        throw std::runtime_error("Could not allocate clipboard data");
+    }
+
+    const auto dataDest = (char*) GlobalLock(dataHandle);
+    strncpy_s(dataDest, bufferSize, text.c_str(), text.size() + 1);
+    GlobalUnlock(dataHandle);
+
+    const auto resultHandle = SetClipboardData(CF_TEXT, dataHandle);
+    if (resultHandle == nullptr) {
+	    // we only free the copy if the system didn't take ownership of it
+        GlobalFree(dataHandle);
+        throw std::runtime_error("Could not copy data to clipboard");
+    }
+
+    if (!CloseClipboard()) {
+        throw std::runtime_error(std::format("Could not close clipboard: {}", GetLastError()));
+    }
+}
 int main(const int argc, char *argv[])
 {
     try {
@@ -268,7 +312,14 @@ int main(const int argc, char *argv[])
         const auto formatString = std::format("{{:0{}}}", parsed.digits);
         const auto formattedString = std::vformat(formatString, std::make_format_args(hotp));
 
-        WriteString(formattedString);
+        if (parsed.copyToClipboard) {
+            SetTextToClipboard(formattedString);
+        }
+
+        if (parsed.writeToStdOut) {
+            WriteString(formattedString);
+        }
+        
         return 0;
     }
     catch (const std::exception& e) {
